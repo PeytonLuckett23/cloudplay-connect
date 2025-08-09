@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabase } from "@/integrations/supabase/client";
 
 interface AuthValues { email: string; password?: string }
 
@@ -11,13 +11,17 @@ export const AuthForm = () => {
   const { register, handleSubmit, formState: { isSubmitting }, getValues } = useForm<AuthValues>();
 
   const onSignIn = handleSubmit(async ({ email, password }) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password: password || "" });
+    const sb = getSupabase();
+    if (!sb) return toast({ title: "Auth unavailable", description: "Supabase not configured. Connect via the green Supabase button." });
+    const { error } = await sb.auth.signInWithPassword({ email, password: password || "" });
     if (error) return toast({ title: "Sign in failed", description: error.message });
     toast({ title: "Signed in", description: "Welcome back!" });
   });
 
   const onSignUp = handleSubmit(async ({ email, password }) => {
-    const { error } = await supabase.auth.signUp({ email, password: password || "" });
+    const sb = getSupabase();
+    if (!sb) return toast({ title: "Auth unavailable", description: "Supabase not configured." });
+    const { error } = await sb.auth.signUp({ email, password: password || "" });
     if (error) return toast({ title: "Sign up failed", description: error.message });
     toast({ title: "Check your email", description: "Confirm your account to continue." });
   });
@@ -25,8 +29,10 @@ export const AuthForm = () => {
   const onMagic = async () => {
     const { email } = getValues();
     if (!email) return toast({ title: "Email required", description: "Enter your email above." });
+    const sb = getSupabase();
+    if (!sb) return toast({ title: "Auth unavailable", description: "Supabase not configured." });
     const redirectTo = `${window.location.origin}`;
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
     if (error) return toast({ title: "Magic link failed", description: error.message });
     toast({ title: "Magic link sent", description: "Check your inbox." });
   };

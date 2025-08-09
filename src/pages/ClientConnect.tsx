@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useSEO } from "@/hooks/useSEO";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabase } from "@/integrations/supabase/client";
 
 const ClientConnect = () => {
   useSEO({ title: "Client Connect | CloudPlay BYOG", description: "Join a host using a session code" });
@@ -17,7 +17,9 @@ const ClientConnect = () => {
 
   const sendOffer = async () => {
     if (!code || !offer) return toast({ title: "Missing info", description: "Enter code and offer" });
-    const { data, error } = await supabase.functions.invoke("sessions-sdp", { body: { code, type: "offer", payload: offer } });
+    const sb = getSupabase();
+    if (!sb) return toast({ title: "Supabase not configured" });
+    const { data, error } = await sb.functions.invoke("sessions-sdp", { body: { code, type: "offer", payload: offer } });
     if (error) return toast({ title: "Failed to send", description: error.message });
     if (data?.answer) setAnswer(data.answer);
     toast({ title: "Offer sent" });

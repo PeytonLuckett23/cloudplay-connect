@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabase } from "@/integrations/supabase/client";
 import { useSEO } from "@/hooks/useSEO";
 import { Link } from "react-router-dom";
 
@@ -15,7 +15,9 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("sessions").select("id, code, status, created_at").eq("host_user_id", user.id).order("created_at", { ascending: false })
+    const sb = getSupabase();
+    if (!sb) return;
+    sb.from("sessions").select("id, code, status, created_at").eq("host_user_id", user.id).order("created_at", { ascending: false })
       .then(({ data }) => setSessions(data || []));
   }, [user]);
 

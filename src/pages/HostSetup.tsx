@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabase } from "@/integrations/supabase/client";
 import { useSEO } from "@/hooks/useSEO";
 
 const HostSetup = () => {
@@ -13,7 +13,9 @@ const HostSetup = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
 
   const createSession = async () => {
-    const { data, error } = await supabase.functions.invoke("sessions-create", { body: {} });
+    const sb = getSupabase();
+    if (!sb) return toast({ title: "Supabase not configured", description: "Connect via the green Supabase button." });
+    const { data, error } = await sb.functions.invoke("sessions-create", { body: {} });
     if (error) return toast({ title: "Failed to create session", description: error.message });
     setCode(data.code);
     setSessionId(data.id);
@@ -25,7 +27,9 @@ const HostSetup = () => {
 
   const closeSession = async () => {
     if (!sessionId && !code) return;
-    const { error } = await supabase.functions.invoke("sessions-close", { body: { id: sessionId, code } });
+    const sb = getSupabase();
+    if (!sb) return toast({ title: "Supabase not configured" });
+    const { error } = await sb.functions.invoke("sessions-close", { body: { id: sessionId, code } });
     if (error) return toast({ title: "Failed to close", description: error.message });
     toast({ title: "Session closed" });
   };

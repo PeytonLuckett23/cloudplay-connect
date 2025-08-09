@@ -1,8 +1,14 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// Temporary client. If the Lovable Supabase integration generates this file later,
-// it will replace this implementation. Do not modify in place once generated.
-const url = import.meta.env.VITE_SUPABASE_URL as string;
-const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+let client: SupabaseClient | null = null;
 
-export const supabase = createClient(url, anon);
+export const getSupabase = (): SupabaseClient | null => {
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+  if (!url || !anon) {
+    console.error("Supabase env vars missing. Ensure your project is connected to Supabase and environment variables are available.");
+    return null;
+  }
+  if (!client) client = createClient(url, anon);
+  return client;
+};
