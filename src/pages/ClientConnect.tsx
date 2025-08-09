@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,24 +6,33 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useSEO } from "@/hooks/useSEO";
 import { toast } from "@/hooks/use-toast";
-import { getSupabase } from "@/integrations/supabase/client";
 
 const ClientConnect = () => {
   useSEO({ title: "Client Connect | CloudPlay BYOG", description: "Join a host using a session code" });
 
-  const [code, setCode] = useState("");
-  const [offer, setOffer] = useState("");
-  const [answer, setAnswer] = useState("");
+  const [sessionId, setSessionId] = useState("");
+  const [log, setLog] = useState<string[]>([]);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  const sendOffer = async () => {
-    if (!code || !offer) return toast({ title: "Missing info", description: "Enter code and offer" });
-    const sb = getSupabase();
-    if (!sb) return toast({ title: "Supabase not configured" });
-    const { data, error } = await sb.functions.invoke("sessions-sdp", { body: { code, type: "offer", payload: offer } });
-    if (error) return toast({ title: "Failed to send", description: error.message });
-    if (data?.answer) setAnswer(data.answer);
-    toast({ title: "Offer sent" });
+  const join = () => {
+    if (!sessionId) return toast({ title: "Enter a session ID" });
+    try {
+      const ws = new WebSocket("ws://localhost:8080/ws");
+      wsRef.current = ws;
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ join: sessionId }));
+        setLog((l) => ["Connected to signaling server", ...l]);
+      };
+      ws.onmessage = (e) => setLog((l) => ["<- " + e.data, ...l]);
+      ws.onclose = () => setLog((l) => ["Disconnected", ...l]);
+      ws.onerror = () => setLog((l) => ["WebSocket error", ...l]);
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Failed to connect" });
+    }
   };
+
+  useEffect(() => () => { wsRef.current?.close(); }, []);
 
   return (
     <main className="container py-8">
@@ -34,20 +43,21 @@ const ClientConnect = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="code">Session Code</Label>
-              <Input id="code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ABC123" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="offer">SDP Offer (optional preview)</Label>
-              <Textarea id="offer" value={offer} onChange={(e) => setOffer(e.target.value)} placeholder="Paste your SDP offer here" />
-            </div>
-            <Button onClick={sendOffer}>Send Offer</Button>
-            {answer && (
-              <div className="space-y-2">
-                <Label>Answer</Label>
-                <Textarea readOnly value={answer} />
+              <Label htmlFor="code">Session ID</Label>
+              <div className="flex gap-2">
+                <Input id="code" value={sessionId} onChange={(e) => setSessionId(e.target.value.toUpperCase())} placeholder="ABC123" />
+                <Button size="lg" onClick={join}>Join</Button>
               </div>
-            )}
+            </div>
+
+            <div className="aspect-video bg-muted rounded-md overflow-hidden">
+              <video id="remoteVideo" className="w-full h-full" autoPlay playsInline />
+            </div>
+
+            <div>
+              <Label>Signaling Log</Label>
+              <Textarea readOnly value={log.join("\n")} className="min-h-32" />
+            </div>
           </CardContent>
         </Card>
       </div>

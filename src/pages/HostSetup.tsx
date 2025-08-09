@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,30 +9,44 @@ import { useSEO } from "@/hooks/useSEO";
 
 const HostSetup = () => {
   useSEO({ title: "Host Setup | CloudPlay BYOG", description: "Create a session and share the code" });
-  const [code, setCode] = useState("");
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [latest, setLatest] = useState<string>("");
+
+  const loadLatest = async () => {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    const { data } = await sb
+      .from("sessions")
+      .select("sessionId, createdAt")
+      .eq("ownerId", user.id)
+      .eq("status", "active")
+      .order("createdAt", { ascending: false })
+      .limit(1);
+    setLatest(data?.[0]?.sessionId || "");
+  };
+
+  useEffect(() => { loadLatest(); }, []);
 
   const createSession = async () => {
     const sb = getSupabase();
     if (!sb) return toast({ title: "Supabase not configured", description: "Connect via the green Supabase button." });
-    const { data, error } = await sb.functions.invoke("sessions-create", { body: {} });
+    const { data, error } = await sb.functions.invoke("createSession", { body: {} });
     if (error) return toast({ title: "Failed to create session", description: error.message });
-    setCode(data.code);
-    setSessionId(data.id);
-    toast({ title: "Session created", description: `Code ${data.code} copied` });
-    try {
-      await navigator.clipboard.writeText(data.code);
-    } catch {}
+    setLatest(data.sessionId);
+    try { await navigator.clipboard.writeText(data.sessionId); } catch {}
   };
 
   const closeSession = async () => {
-    if (!sessionId && !code) return;
+    if (!latest) return;
     const sb = getSupabase();
     if (!sb) return toast({ title: "Supabase not configured" });
-    const { error } = await sb.functions.invoke("sessions-close", { body: { id: sessionId, code } });
+    const { error } = await sb.functions.invoke("closeSession", { body: { sessionId: latest } });
     if (error) return toast({ title: "Failed to close", description: error.message });
-    toast({ title: "Session closed" });
+    setLatest("");
   };
+
+  const copy = async () => { if (latest) try { await navigator.clipboard.writeText(latest); } catch {} };
 
   return (
     <main className="container py-8">
@@ -42,17 +56,20 @@ const HostSetup = () => {
             <CardTitle>Host Setup</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">Create a session to receive a one‑time connection code. Share it with your client device to connect.</p>
-            <Button onClick={createSession}>Create Session</Button>
-            {code && (
+            <p className="text-sm text-muted-foreground">Run the Host App on your gaming PC. Use this session code in the Host App to connect.</p>
+            <Button size="lg" onClick={createSession}>Create Session</Button>
+            {latest && (
               <div className="space-y-2">
-                <Label>Session Code</Label>
-                <Input readOnly value={code} />
+                <Label>Latest Session ID</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={latest} />
+                  <Button variant="outline" onClick={copy}>Copy</Button>
+                </div>
               </div>
             )}
           </CardContent>
           <CardFooter>
-            {code && <Button variant="destructive" onClick={closeSession}>Close Session</Button>}
+            {latest && <Button variant="destructive" onClick={closeSession}>Close Session</Button>}
           </CardFooter>
         </Card>
 
@@ -62,10 +79,10 @@ const HostSetup = () => {
           </CardHeader>
           <CardContent className="prose prose-sm dark:prose-invert max-w-none">
             <ol>
-              <li>Install your game host and ensure network access.</li>
-              <li>Create a session to generate a code.</li>
-              <li>On the client device, open Client Connect and paste the code.</li>
-              <li>Accept the connection request on the host when prompted.</li>
+              <li>Run the Host App on your gaming PC.</li>
+              <li>Press Create Session to generate a session ID.</li>
+              <li>In the Host App, paste the session ID to connect.</li>
+              <li>Share the session ID with your client device.</li>
             </ol>
           </CardContent>
         </Card>
